@@ -2,6 +2,12 @@
 
 Python CDK stack deploying a secure, private infrastructure environment in **ap-southeast-6** (Asia Pacific - New Zealand).
 
+
+Notes:
+- Rocky Linux AMIs are not available in NZL region as of this writing. We use RHEL instead.
+- Workspaces secure browser is not available in NZL region as of this writing.
+- Amazon Location Service is not avalable in NZL region as of this writing.
+
 ## Architecture
 
 ```
@@ -58,7 +64,7 @@ or (for more human readable output)
 
 - **VPC CIDR:** 10.55.0.0/16
 - **NAT Gateway:** Single (non-HA), in public subnet AZ1
-- **VPC Endpoints:** SSM, SSM Messages, CloudWatch Logs (interface), S3 (gateway)
+- **VPC Endpoints:** SSM, CloudWatch Logs (interface), S3 (gateway)
 - **Security Groups:**
   - EC2: allows all traffic between instances in the group, all outbound
   - RDS: allows TCP 1433 from EC2 security group only, no outbound
