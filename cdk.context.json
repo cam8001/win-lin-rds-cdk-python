@@ -1,0 +1,8 @@
+{
+  "availability-zones:account=016445799387:region=ap-southeast-6": [
+    "ap-southeast-6a",
+    "ap-southeast-6b",
+    "ap-southeast-6c"
+  ],
+  "ami:account=016445799387:filters.image-type.0=machine:filters.name.0=RHEL-9.6*_HVM-*-x86_64-*:filters.state.0=available:owners.0=309956199498:region=ap-southeast-6": "ami-04cfe2f71f2d1110f"
+}
