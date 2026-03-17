@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_rds as rds,
     aws_s3 as s3,
+    aws_ssm as ssm,
 )
 from constructs import Construct
 
@@ -257,6 +258,162 @@ class PrivateWindowsLinuxSQLStack(Stack):
                 secret_name="rds-sql-server-credentials",
             ),
         )
+
+        # -----------------------------------------------------------
+        # Systems Manager - Patch Baselines
+        # -----------------------------------------------------------
+
+        # Linux (RHEL) - Critical and Important security patches,
+        # auto-approve after 7 days
+        linux_baseline = ssm.CfnPatchBaseline(self, "LinuxPatchBaseline",
+            name="LinuxPatchBaseline",
+            operating_system="REDHAT_ENTERPRISE_LINUX",
+            description="RHEL 9 - Critical and Important security patches",
+            patch_groups=["Linux"],
+            approval_rules=ssm.CfnPatchBaseline.RuleGroupProperty(
+                patch_rules=[
+                    ssm.CfnPatchBaseline.RuleProperty(
+                        approve_after_days=7,
+                        compliance_level="CRITICAL",
+                        patch_filter_group=ssm.CfnPatchBaseline.PatchFilterGroupProperty(
+                            patch_filters=[
+                                ssm.CfnPatchBaseline.PatchFilterProperty(
+                                    key="CLASSIFICATION",
+                                    values=["Security"],
+                                ),
+                                ssm.CfnPatchBaseline.PatchFilterProperty(
+                                    key="SEVERITY",
+                                    values=["Critical", "Important"],
+                                ),
+                            ]
+                        ),
+                    )
+                ]
+            ),
+        )
+
+        # Windows - Critical and Important security patches,
+        # auto-approve after 7 days
+        windows_baseline = ssm.CfnPatchBaseline(self, "WindowsPatchBaseline",
+            name="WindowsPatchBaseline",
+            operating_system="WINDOWS",
+            description="Windows Server 2022 - Critical and Important security patches",
+            patch_groups=["Windows"],
+            approval_rules=ssm.CfnPatchBaseline.RuleGroupProperty(
+                patch_rules=[
+                    ssm.CfnPatchBaseline.RuleProperty(
+                        approve_after_days=7,
+                        compliance_level="CRITICAL",
+                        patch_filter_group=ssm.CfnPatchBaseline.PatchFilterGroupProperty(
+                            patch_filters=[
+                                ssm.CfnPatchBaseline.PatchFilterProperty(
+                                    key="CLASSIFICATION",
+                                    values=["SecurityUpdates", "CriticalUpdates"],
+                                ),
+                                ssm.CfnPatchBaseline.PatchFilterProperty(
+                                    key="MSRC_SEVERITY",
+                                    values=["Critical", "Important"],
+                                ),
+                            ]
+                        ),
+                    )
+                ]
+            ),
+        )
+
+        # -----------------------------------------------------------
+        # Systems Manager - Maintenance Window
+        # Weekly Sunday 02:00 NZST (13:00 UTC Saturday), 4h window,
+        # 1h cutoff
+        # -----------------------------------------------------------
+        maintenance_window = ssm.CfnMaintenanceWindow(self, "PatchMaintenanceWindow",
+            name="WeeklyPatchWindow",
+            description="Weekly patching - Sunday 02:00 NZST",
+            schedule="cron(0 13 ? * SAT *)",
+            schedule_timezone="Pacific/Auckland",
+            duration=4,
+            cutoff=1,
+            allow_unassociated_targets=False,
+        )
+
+        # Target: all instances tagged with Patch=Linux
+        linux_target = ssm.CfnMaintenanceWindowTarget(self, "LinuxPatchTarget",
+            window_id=maintenance_window.ref,
+            resource_type="INSTANCE",
+            targets=[ssm.CfnMaintenanceWindowTarget.TargetsProperty(
+                key="tag:Patch",
+                values=["Linux"],
+            )],
+            name="LinuxInstances",
+        )
+
+        # Target: all instances tagged with Patch=Windows
+        windows_target = ssm.CfnMaintenanceWindowTarget(self, "WindowsPatchTarget",
+            window_id=maintenance_window.ref,
+            resource_type="INSTANCE",
+            targets=[ssm.CfnMaintenanceWindowTarget.TargetsProperty(
+                key="tag:Patch",
+                values=["Windows"],
+            )],
+            name="WindowsInstances",
+        )
+
+        # Task: run AWS-RunPatchBaseline on Linux instances
+        ssm.CfnMaintenanceWindowTask(self, "LinuxPatchTask",
+            window_id=maintenance_window.ref,
+            task_arn="AWS-RunPatchBaseline",
+            task_type="RUN_COMMAND",
+            priority=1,
+            max_concurrency="1",
+            max_errors="1",
+            name="PatchLinuxInstances",
+            targets=[ssm.CfnMaintenanceWindowTask.TargetProperty(
+                key="WindowTargetIds",
+                values=[linux_target.ref],
+            )],
+            task_invocation_parameters=ssm.CfnMaintenanceWindowTask.TaskInvocationParametersProperty(
+                maintenance_window_run_command_parameters=ssm.CfnMaintenanceWindowTask.MaintenanceWindowRunCommandParametersProperty(
+                    parameters={"Operation": ["Install"]},
+                )
+            ),
+        )
+
+        # Task: run AWS-RunPatchBaseline on Windows instances
+        ssm.CfnMaintenanceWindowTask(self, "WindowsPatchTask",
+            window_id=maintenance_window.ref,
+            task_arn="AWS-RunPatchBaseline",
+            task_type="RUN_COMMAND",
+            priority=1,
+            max_concurrency="1",
+            max_errors="1",
+            name="PatchWindowsInstances",
+            targets=[ssm.CfnMaintenanceWindowTask.TargetProperty(
+                key="WindowTargetIds",
+                values=[windows_target.ref],
+            )],
+            task_invocation_parameters=ssm.CfnMaintenanceWindowTask.TaskInvocationParametersProperty(
+                maintenance_window_run_command_parameters=ssm.CfnMaintenanceWindowTask.MaintenanceWindowRunCommandParametersProperty(
+                    parameters={"Operation": ["Install"]},
+                )
+            ),
+        )
+
+        # Tag EC2 instances for patch group targeting
+        for instance in [linux_large, linux_small]:
+            instance.instance.add_property_override(
+                "Tags",
+                [{"Key": "Patch", "Value": "Linux"}],
+            )
+        for instance in [windows_1, windows_2]:
+            instance.instance.add_property_override(
+                "Tags",
+                [{"Key": "Patch", "Value": "Windows"}],
+            )
+
+        # -----------------------------------------------------------
+        # IAM Identity Center — deployed as a separate stack (IdentityCenterStack)
+        # See infra/identity_center_stack.py
+        # -----------------------------------------------------------
 
         # -----------------------------------------------------------
         # CloudFormation Outputs

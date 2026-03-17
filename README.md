@@ -75,6 +75,47 @@ or (for more human readable output)
 - S3-managed encryption, SSL enforced, public access blocked
 - EC2 instance role has read/write access
 
+## Systems Manager
+
+### Session Manager
+- All EC2 instances use `AmazonSSMManagedInstanceCore` managed policy
+- SSM and SSM Messages VPC interface endpoints in private subnets
+- No SSH or RDP ports required — access via Session Manager console or CLI
+
+### Patch Management
+- **Linux baseline** (`LinuxPatchBaseline`): RHEL — Critical/Important security patches, auto-approved after 7 days
+- **Windows baseline** (`WindowsPatchBaseline`): Windows Server 2022 — Critical/Important security patches, auto-approved after 7 days
+- EC2 instances are tagged `Patch=Linux` or `Patch=Windows` for targeting
+
+### Maintenance Window
+- **Schedule:** Weekly, Sunday 02:00 NZST (cron `0 13 ? * SAT *` UTC)
+- **Duration:** 4 hours, 1 hour cutoff
+- Runs `AWS-RunPatchBaseline` with `Operation=Install` on each patch group
+
+## IAM Identity Center
+
+- Built-in identity store (no external IdP required)
+- Two permission sets provisioned:
+  - `InfrastructureAdmin` — `AdministratorAccess`, 8h session
+  - `InfrastructureViewer` — `ReadOnlyAccess`, 8h session
+- **MFA:** Must be enabled manually after deployment — IAM Identity Center console → Settings → Authentication → MFA → **Require MFA for all sign-ins** (CloudFormation does not support this setting)
+
+### Stack Outputs
+After deployment, the stack outputs:
+- `IdentityCenterInstanceArn` — needed for CLI account assignments
+- `IdentityCenterAccessPortalUrl` — portal URL to share with users to sign in
+- `IdentityCenterIdentityStoreId` — needed to create users via CLI: `aws identitystore create-user --identity-store-id <id> --region ap-southeast-6`
+- `AdminPermissionSetArn` / `ViewerPermissionSetArn` — needed to assign users to accounts
+
+### Deployment Note: Organizations Management Accounts
+`AWS::SSO::Instance` and `AWS::SSO::PermissionSet` **cannot be deployed from an AWS Organizations management account**. The `IdentityCenterStack` no longer creates an IIC instance — it accepts the existing instance ARN as a CloudFormation parameter and only manages permission sets.
+
+If `AWS::SSO::PermissionSet` also fails from your account, use a [delegated administrator account](https://docs.aws.amazon.com/singlesignon/latest/userguide/delegated-admin.html) for Identity Center management, or create the permission sets manually in the console.
+
+### Regional Notes (ap-southeast-6)
+- **Opt-in region:** ap-southeast-6 must be explicitly enabled in all AWS accounts you want to manage access for via AWS Organizations before deploying
+- **Email routing:** IAM Identity Center has no local SES endpoint in ap-southeast-6 — OTP codes, password reset emails, and user invite emails are sent via `ap-southeast-2` (Sydney). The following user attributes cross to Sydney for email delivery: email address, first/last name, username, directory ID, user ID, account info, and access portal URL. Consider this if data sovereignty requirements apply
+
 ## IAM
 
 - Shared EC2 instance role with:
@@ -103,28 +144,56 @@ pip install -r requirements.txt
 # Synth (requires valid credentials for AMI lookups on first run)
 npx cdk synth
 
-# Deploy
-npx cdk deploy
+# Deploy core infrastructure (NZ region)
+npx cdk deploy PrivateWindowsLinuxSQLStack
+
+# Deploy IAM Identity Center permission sets — requires existing instance ARN
+# Find your instance ARN first:
+#   aws sso-admin list-instances --region ap-southeast-6
+npx cdk deploy IdentityCenterStack --parameters IdentityCenterStack:InstanceArn=<arn>
+
+# Deploy Secure Browser (Sydney region)
+npx cdk deploy SecureBrowserStack
 ```
 
 ## Regional Limitations (ap-southeast-6, March 2026)
 
 - **Rocky Linux AMIs:** Official Rocky Linux Foundation AMIs (owner `792107900819`) are not published in this region. Using RHEL 9.6 (binary-compatible). To switch to Rocky, copy the official AMI from ap-southeast-2 or use a Marketplace reseller image.
 - **EC2 Messages VPC Endpoint:** Not available in this region. SSM RunCommand/SendCommand routes via NAT Gateway. Session Manager is unaffected (uses `ssm` + `ssmmessages` endpoints).
-- **WorkSpaces Secure Browser:** Not available. Requires deployment in ap-southeast-2 (Sydney).
-- **Amazon Location Service:** Not available. Requires deployment in ap-southeast-2 (Sydney).
+- **WorkSpaces Secure Browser:** Not available in ap-southeast-6. Deployed as a separate stack in ap-southeast-2 (Sydney) — see `SecureBrowserStack`.
+- **Amazon Location Service:** Not available in ap-southeast-6. See Future Considerations.
 
 ## Planned Phases
 
 - [x] Phase 1 - VPC and network foundation
 - [x] Phase 2 - EC2 compute and S3
 - [x] Phase 3 - RDS SQL Server
-- [ ] Phase 4 - Systems Manager (Session Manager, patch baselines, maintenance windows)
-- [ ] Phase 5 - IAM Identity Center (built-in directory, MFA required)
-- [ ] Phase 6 - Deferred services (Secure Browser, Location Service - Sydney only)
+- [x] Phase 4 - Systems Manager (Session Manager, patch baselines, maintenance windows)
+- [x] Phase 5 - IAM Identity Center (built-in directory, MFA required, permission sets)
+- [x] Phase 6 - WorkSpaces Secure Browser (ap-southeast-2 / Sydney stack)
+
+## WorkSpaces Secure Browser
+
+Deployed as a separate CDK stack (`SecureBrowserStack`) in **ap-southeast-2 (Sydney)** — not available in ap-southeast-6.
+
+- Portal authentication: `Standard` (SAML) — configure an identity provider post-deployment in the WorkSpaces Web console
+- **Note:** `IAM_Identity_Center` auth requires an IIC instance in the same region as the portal (ap-southeast-2). Our IIC instance is in ap-southeast-6. To switch to IIC auth, first replicate the IIC instance to ap-southeast-2 via the IAM Identity Center console (Settings → Replicate to region), then change `authentication_type` to `IAM_Identity_Center` in `secure_browser_construct.py`
+- Dedicated VPC (`10.56.0.0/16`) with two isolated subnets across two AZs in Sydney
+- Users access the portal via the URL output from `SecureBrowserStack`
+
+To deploy:
+```bash
+# Prerequisite: ensure the WorkSpaces Web service-linked role exists in the account.
+# This is an AWS-managed role created automatically on first use, but must exist
+# before CDK can deploy NetworkSettings. Run once per account (safe to re-run):
+aws iam create-service-linked-role --aws-service-name workspaces-web.amazonaws.com
+
+npx cdk deploy SecureBrowserStack
+```
 
 ## Future Considerations
 
 - **Self-service sign-up:** If needed, migrate identity to Amazon Cognito with a pre-sign-up Lambda trigger to restrict email domains to approved organisations.
 - **NAT Gateway HA:** Currently single NAT GW. For production resilience, consider one per AZ.
 - **RDS credentials access:** EC2 instances do not currently have permission to read the RDS secret from Secrets Manager. Grant access when application integration is needed.
+- **Amazon Location Service:** Not available in ap-southeast-6. If required, deploy a separate stack in ap-southeast-2 (Sydney), similar to the Secure Browser pattern.
