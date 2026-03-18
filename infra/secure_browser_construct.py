@@ -16,6 +16,8 @@ class SecureBrowserConstruct(Construct):
     The portal ENI is created by the WorkSpaces Web service inside the provided
     subnets — no VPC peering to ap-southeast-6 is required for browser sessions.
     Users access the portal via the public portal URL provided in the stack output.
+
+    TODO: confirm connectivity between secure browser VPC and Infra VPC
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -58,6 +60,7 @@ class SecureBrowserConstruct(Construct):
         # instance in the same region as the portal (ap-southeast-2), but our IIC
         # instance is in ap-southeast-6. To use IIC auth, replicate the IIC instance
         # to ap-southeast-2 via the IAM Identity Center console first.
+        # OR
         # With Standard auth, configure a SAML identity provider post-deployment.
         portal = workspacesweb.CfnPortal(self, "Portal",
             display_name="Private Infrastructure Portal",
