@@ -2,7 +2,7 @@
 
 Python CDK stack deploying a secure, private infrastructure environment in **ap-southeast-6** (Asia Pacific - New Zealand).
 
-This IS NOT designed for production use, its merely an experiment to show the use of cdk with Python in the AWS New Zealand region. You are responsbiel for testing, securing, and optimizing this code. Deployment of the stack will incur charges in your account.
+This IS NOT designed for production use, its merely an experiment to show the use of cdk with Python in the AWS New Zealand region. You are responsible for testing, securing, and optimizing this code. Deployment of the stack will incur charges in your account.
 
 Notes:
 
