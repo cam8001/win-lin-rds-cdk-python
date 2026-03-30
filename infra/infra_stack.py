@@ -193,6 +193,17 @@ class PrivateWindowsLinuxSQLStack(Stack):
             ],
         )
 
+        # -----------------------------------------------------------
+        # Install SSM Agent on RHEL instances via user data
+        # RHEL AMIs from Red Hat do not include SSM Agent by default.
+        # -----------------------------------------------------------
+        for instance in [linux_large, linux_small]:
+            instance.add_user_data(
+                "sudo dnf install -y https://s3.ap-southeast-6.amazonaws.com/amazon-ssm-ap-southeast-6/latest/linux_amd64/amazon-ssm-agent.rpm",
+                "sudo systemctl enable amazon-ssm-agent",
+                "sudo systemctl start amazon-ssm-agent",
+            )
+
         # Windows Server 2022 - Instance 1
         # c7i.2xlarge: 8 vCPU, 16 GiB RAM
         windows_1 = ec2.Instance(self, "Windows1",
