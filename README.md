@@ -16,6 +16,7 @@ Notes:
 - Install the cdk cli tool into your terminal: https://docs.aws.amazon.com/cdk/v2/guide/getting-started.html
 - Get some credentials for your local CLI: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-authentication.html
 - Bootstrap your AWS environment to use cdk with `cdk bootstrap`
+- Set up a `.venv` - `python3 -m env .venv`
 - Enable the python environment: `source .venv/bin/activate && pip install -r requirements.txt`
 - Deploy your stacks! Start with `cdk deploy PrivateWindowsLinuxSQLStack`
 
