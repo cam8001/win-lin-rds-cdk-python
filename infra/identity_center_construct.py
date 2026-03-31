@@ -1,6 +1,5 @@
 from aws_cdk import (
     CfnOutput,
-    CfnParameter,
     Fn,
     aws_sso as sso,
 )
@@ -11,8 +10,10 @@ class IdentityCenterConstruct(Construct):
     """
     IAM Identity Center permission sets using an existing IIC instance.
 
-    The instance ARN must be passed in as a CloudFormation parameter at deploy time:
-      npx cdk deploy IdentityCenterStack --parameters IdentityCenterStack:InstanceArn=<arn>
+    The instance ARN is passed in from the parent stack.
+
+    Deploy with:
+      npx cdk deploy IdentityCenterStack --parameters InstanceArn=<arn>
 
     To find your instance ARN:
       aws sso-admin list-instances --region ap-southeast-6
@@ -26,15 +27,8 @@ class IdentityCenterConstruct(Construct):
       Settings → Authentication → MFA → Require MFA for all sign-ins
     """
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, instance_arn: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        instance_arn_param = CfnParameter(self, "InstanceArn",
-            type="String",
-            description="Existing IAM Identity Center instance ARN (from: aws sso-admin list-instances --region ap-southeast-6)",
-        )
-
-        instance_arn = instance_arn_param.value_as_string
 
         # Permission set: full infrastructure admin access, 8h session
         admin_ps = sso.CfnPermissionSet(self, "AdminPermissionSet",
