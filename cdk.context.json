@@ -20,5 +20,16 @@
     "ap-southeast-2a",
     "ap-southeast-2b",
     "ap-southeast-2c"
+  ],
+  "availability-zones:account=738198121355:region=ap-southeast-6": [
+    "ap-southeast-6a",
+    "ap-southeast-6b",
+    "ap-southeast-6c"
+  ],
+  "ami:account=738198121355:filters.image-type.0=machine:filters.name.0=RHEL-9.6*_HVM-*-x86_64-*:filters.state.0=available:owners.0=309956199498:region=ap-southeast-6": "ami-02499e80a4eae7726",
+  "availability-zones:account=738198121355:region=ap-southeast-2": [
+    "ap-southeast-2a",
+    "ap-southeast-2b",
+    "ap-southeast-2c"
   ]
 }

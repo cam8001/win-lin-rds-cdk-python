@@ -1,4 +1,4 @@
-from aws_cdk import Stack
+from aws_cdk import CfnParameter, Stack
 from constructs import Construct
 from infra.identity_center_construct import IdentityCenterConstruct
 
@@ -13,10 +13,17 @@ class IdentityCenterStack(Stack):
       2. Skip this stack and configure IAM Identity Center manually in the console.
 
     Deploy with:
-      npx cdk deploy IdentityCenterStack
+      npx cdk deploy IdentityCenterStack --parameters InstanceArn=<arn>
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        IdentityCenterConstruct(self, "IdentityCenter")
+        instance_arn_param = CfnParameter(self, "InstanceArn",
+            type="String",
+            description="Existing IAM Identity Center instance ARN (from: aws sso-admin list-instances --region ap-southeast-6)",
+        )
+
+        IdentityCenterConstruct(self, "IdentityCenter",
+            instance_arn=instance_arn_param.value_as_string,
+        )
