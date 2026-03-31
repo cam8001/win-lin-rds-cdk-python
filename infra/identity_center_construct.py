@@ -16,7 +16,7 @@ class IdentityCenterConstruct(Construct):
       npx cdk deploy IdentityCenterStack --parameters InstanceArn=<arn>
 
     To find your instance ARN:
-      aws sso-admin list-instances --region ap-southeast-6
+      aws sso-admin list-instances --region ap-southeast-2
 
     Permission sets created:
       - InfrastructureAdmin  : AdministratorAccess (full infra access)

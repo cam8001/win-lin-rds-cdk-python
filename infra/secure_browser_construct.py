@@ -56,15 +56,11 @@ class SecureBrowserConstruct(Construct):
             security_group_ids=[sg.security_group_id],
         )
 
-        # Portal — Standard auth type. IAM Identity Center auth requires an IIC
-        # instance in the same region as the portal (ap-southeast-2), but our IIC
-        # instance is in ap-southeast-6. To use IIC auth, replicate the IIC instance
-        # to ap-southeast-2 via the IAM Identity Center console first.
-        # OR
-        # With Standard auth, configure a SAML identity provider post-deployment.
+        # Portal — IAM Identity Center auth. Requires an IIC instance in the
+        # same region as the portal (ap-southeast-2).
         portal = workspacesweb.CfnPortal(self, "Portal",
             display_name="Private Infrastructure Portal",
-            authentication_type="Standard",
+            authentication_type="IAM_Identity_Center",
             network_settings_arn=network_settings.attr_network_settings_arn,
         )
 

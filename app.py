@@ -16,7 +16,11 @@ PrivateWindowsLinuxSQLStack(app, "PrivateWindowsLinuxSQLStack", env=env_nz)
 
 # IAM Identity Center — separate stack, cannot deploy from org management account
 # See README for details
-IdentityCenterStack(app, "IdentityCenterStack", env=env_nz)
+env_sydney = cdk.Environment(
+    account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+    region="ap-southeast-2",
+)
+IdentityCenterStack(app, "IdentityCenterStack", env=env_sydney)
 
 # WorkSpaces Secure Browser — only available in ap-southeast-2 (Sydney)
 SecureBrowserStack(app, "SecureBrowserStack",

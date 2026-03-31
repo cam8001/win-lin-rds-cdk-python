@@ -21,7 +21,7 @@ class IdentityCenterStack(Stack):
 
         instance_arn_param = CfnParameter(self, "InstanceArn",
             type="String",
-            description="Existing IAM Identity Center instance ARN (from: aws sso-admin list-instances --region ap-southeast-6)",
+            description="Existing IAM Identity Center instance ARN (from: aws sso-admin list-instances --region ap-southeast-2)",
         )
 
         IdentityCenterConstruct(self, "IdentityCenter",
